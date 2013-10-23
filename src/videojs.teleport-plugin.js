@@ -35,7 +35,7 @@
       var
         // save a reference to the player instance
         player = this,
-        user = '12345', //unique user identifier
+        user = fetchUserId(); //unique user identifier
         videoId = '010101', //it of video being watched
 
         // merge options and defaults
@@ -69,7 +69,7 @@
           return xmlHttp.responseText;
         }
       };
-
+      
       player.on('play', function() {
         console.log('play');
       });
@@ -79,8 +79,34 @@
       });
 
       player.on('pause', function() {
-        player.teleportplugin.savePosition();
+        if (user) {
+          player.teleportplugin.savePosition();
+        }
       });
+    },
+
+
+    /**
+     * Fetchs the user's facebook ID from the BC_teleport cookie if it's present. 
+     * @return String representing the userId. If no cookie was found returns null.
+     */ 
+    fetchUserId = function() {
+      var
+        // A list of all cookies accessible from this domain. 
+        cookieList = document.cookie.split(';'),
+        
+        // Used when looping through the list to find BC_teleport.
+        currentCookie;
+
+      // Go through the list of browser cookies
+      for (var i=0; i < cookieList.length; i++) {
+        currentCookie = cookieList[i];
+          if (currentCookie.indexOf('BC_teleport=') != -1) {
+            return currentCookie.split('=')[1];
+        }
+      }
+      // If no applicable cookie was found we return null.  
+      return null;
     };
   
   // register the plugin with video.js
