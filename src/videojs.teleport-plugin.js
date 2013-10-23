@@ -39,28 +39,44 @@
         videoId = '010101', //it of video being watched
         
         seekPosition,
+        updateInterval,
+        lastCheckTime = 0,
 
         // merge options and defaults
-        settings = extend({}, defaults, options || {});
+        settings = extend({updateInterval: 10000, saveSecondsFromEnd: 5}, defaults, options || {});
 
       // replace the initializer with the plugin functionality
       player.teleportplugin = {
-        go: function() {
-          if (settings.awesome) {
-            return 'awesome.';
+        startUpdateInterval: function() {
+          if (settings.updateInterval > 0) {
+            clearInterval(updateInterval);
+            updateInterval = setInterval(function(){
+              if (player.currentTime() != lastCheckTime) {
+                player.teleportplugin.savePosition();
+              }
+            }, settings.updateInterval);
           }
-          return ':(';
         },
-        extreme: function() {
-          return 'awesome!';
+        stopUpdateInterval: function() {
+          if (updateInterval) {
+            clearInterval(updateInterval);
+          }
         },
-        savePosition: function() {
-          var xmlHttp = null;
-          saveUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/set/'+user+'/'+videoId+'/'+player.currentTime();
-          xmlHttp = new XMLHttpRequest();
-          xmlHttp.open( "GET", saveUrl, false );
-          xmlHttp.send( null );
-          return;
+        savePosition: function(position) {
+          //If we aren't setting a specific save point use the currentTime
+          if (!position && position != 0) {
+            position = player.currentTime();
+          }
+
+          //Only save if we're not over the lastSave threshold
+          if ((player.duration() - position) > settings.saveSecondsFromEnd) {
+            var xmlHttp = null;
+            saveUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/set/'+user+'/'+videoId+'/'+position.toString();
+            xmlHttp = new XMLHttpRequest();
+            xmlHttp.open( "GET", saveUrl, false );
+            xmlHttp.send( null );
+            return;
+          } 
         },
         savedPosition: function() {
           var xmlHttp = null;
@@ -69,19 +85,26 @@
           xmlHttp.open( "GET", savedPositionUrl, false );
           xmlHttp.send( null );
           return xmlHttp.responseText;
+        },
+        deletePosition: function() {
+          var xmlHttp = null;
+          savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/delete/'+user+'/'+videoId+'/';
+          xmlHttp = new XMLHttpRequest();
+          xmlHttp.open( "GET", savedPositionUrl, false );
+          xmlHttp.send( null );
+          return xmlHttp.responseText;
         }
       };
       
       player.on('play', function() {
-        console.log('play');
-        if (seekPosition) {
-          player.currentTime(seekPosition);
+        if (user) {
+          player.teleportplugin.startUpdateInterval();
+          duration = parseInt(player.duration());
+          if (seekPosition && parseInt(seekPosition) != duration) {
+            player.currentTime(seekPosition);
+          }
+          seekPosition = 0;
         }
-        seekPosition = 0;
-      });
-
-      player.on('progress', function(){
-
       });
 
       player.on('loadstart', function(){
@@ -91,12 +114,19 @@
       })
 
       player.on('pause', function() {
-        if (user) {
+        player.teleportplugin.stopUpdateInterval();
+        if (user && player.currentTime() != player.duration()) {
           player.teleportplugin.savePosition();
         }
       });
-    },
 
+      player.on('ended', function() {
+        player.teleportplugin.stopUpdateInterval();
+        if (user) {
+          player.teleportplugin.deletePosition();
+        }
+      })
+    },
 
     /**
      * Fetchs the user's facebook ID from the BC_teleport cookie if it's present. 
