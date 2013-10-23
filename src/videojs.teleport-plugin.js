@@ -35,8 +35,10 @@
       var
         // save a reference to the player instance
         player = this,
-        user = fetchUserId(); //unique user identifier
+        user = fetchUserId(), //unique user identifier
         videoId = '010101', //it of video being watched
+        
+        seekPosition,
 
         // merge options and defaults
         settings = extend({}, defaults, options || {});
@@ -62,7 +64,7 @@
         },
         savedPosition: function() {
           var xmlHttp = null;
-          savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/set/'+user+'/'+videoId+'/';
+          savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/get/'+user+'/'+videoId+'/';
           xmlHttp = new XMLHttpRequest();
           xmlHttp.open( "GET", savedPositionUrl, false );
           xmlHttp.send( null );
@@ -72,11 +74,21 @@
       
       player.on('play', function() {
         console.log('play');
+        if (seekPosition) {
+          player.currentTime(seekPosition);
+        }
+        seekPosition = 0;
       });
 
       player.on('progress', function(){
 
       });
+
+      player.on('loadstart', function(){
+        if (user) {
+          seekPosition = player.teleportplugin.savedPosition();
+        }
+      })
 
       player.on('pause', function() {
         if (user) {
@@ -97,6 +109,8 @@
         
         // Used when looping through the list to find BC_teleport.
         currentCookie;
+
+      return 'test';
 
       // Go through the list of browser cookies
       for (var i=0; i < cookieList.length; i++) {
