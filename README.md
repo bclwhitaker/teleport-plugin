@@ -19,7 +19,7 @@ In your web page:
 <script>
 videojs('video', {}, function() {
   var player = this;
-  player.teleport-plugin(); // initialize the plugin
+  player.teleportplugin(); // initialize the plugin
 });
 </script>
 ```
