@@ -35,12 +35,12 @@
       var
         // save a reference to the player instance
         player = this,
-        user = fetchUserId(), //unique user identifier
+        user = fetchUserId() || 'test', //unique user identifier
         videoId = '010101', //it of video being watched
         
         seekPosition,
         updateInterval,
-        lastCheckTime = 0,
+        lastPosition = 0, 
 
         // merge options and defaults
         settings = extend({updateInterval: 10000, saveSecondsFromEnd: 5}, defaults, options || {});
@@ -50,8 +50,11 @@
         startUpdateInterval: function() {
           if (settings.updateInterval > 0) {
             clearInterval(updateInterval);
-            updateInterval = setInterval(function(){
-              if (player.currentTime() != lastCheckTime) {
+            updateInterval = setInterval(function() {
+              var currentPosition = player.currentTime();
+
+              if (currentPosition !== lastPosition) {
+                lastPosition = currentPosition;
                 player.teleportplugin.savePosition();
               }
             }, settings.updateInterval);
@@ -64,32 +67,34 @@
         },
         savePosition: function(position) {
           //If we aren't setting a specific save point use the currentTime
-          if (!position && position != 0) {
+          if (!position) {
             position = player.currentTime();
           }
 
           //Only save if we're not over the lastSave threshold
           if ((player.duration() - position) > settings.saveSecondsFromEnd) {
-            var xmlHttp = null;
-            saveUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/set/'+user+'/'+videoId+'/'+position.toString();
-            xmlHttp = new XMLHttpRequest();
+            var 
+              saveUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/set/'+user+'/'+videoId+'/'+position.toString(),
+              xmlHttp = new XMLHttpRequest();
             xmlHttp.open( "GET", saveUrl, false );
             xmlHttp.send( null );
             return;
           } 
         },
         savedPosition: function() {
-          var xmlHttp = null;
-          savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/get/'+user+'/'+videoId+'/';
-          xmlHttp = new XMLHttpRequest();
+          var 
+            savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/get/'+user+'/'+videoId+'/',
+            xmlHttp = new XMLHttpRequest();
+
           xmlHttp.open( "GET", savedPositionUrl, false );
           xmlHttp.send( null );
           return xmlHttp.responseText;
         },
         deletePosition: function() {
-          var xmlHttp = null;
-          savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/delete/'+user+'/'+videoId+'/';
-          xmlHttp = new XMLHttpRequest();
+          var 
+            savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/delete/'+user+'/'+videoId+'/',
+            xmlHttp = new XMLHttpRequest();
+
           xmlHttp.open( "GET", savedPositionUrl, false );
           xmlHttp.send( null );
           return xmlHttp.responseText;
@@ -97,10 +102,11 @@
       };
       
       player.on('play', function() {
+        var duration;
         if (user) {
           player.teleportplugin.startUpdateInterval();
-          duration = parseInt(player.duration());
-          if (seekPosition && parseInt(seekPosition) != duration) {
+          duration = parseInt(player.duration(), 10);
+          if (seekPosition && parseInt(seekPosition, 10) !== duration) {
             player.currentTime(seekPosition);
           }
           seekPosition = 0;
@@ -111,11 +117,11 @@
         if (user) {
           seekPosition = player.teleportplugin.savedPosition();
         }
-      })
+      });
 
       player.on('pause', function() {
         player.teleportplugin.stopUpdateInterval();
-        if (user && player.currentTime() != player.duration()) {
+        if (user && player.currentTime() !== player.duration()) {
           player.teleportplugin.savePosition();
         }
       });
@@ -125,7 +131,7 @@
         if (user) {
           player.teleportplugin.deletePosition();
         }
-      })
+      });
     },
 
     /**
@@ -140,12 +146,10 @@
         // Used when looping through the list to find BC_teleport.
         currentCookie;
 
-      return 'test';
-
       // Go through the list of browser cookies
       for (var i=0; i < cookieList.length; i++) {
         currentCookie = cookieList[i];
-          if (currentCookie.indexOf('BC_teleport=') != -1) {
+          if (currentCookie.indexOf('BC_teleport=') !== -1) {
             return currentCookie.split('=')[1];
         }
       }

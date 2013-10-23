@@ -55,7 +55,7 @@
     expect(1);
     ok(this.player.teleportplugin, 'the teleportplugin plugin is present');
   });
-
+  /*
   test('is awesome', function() {
     expect(2);
     this.player.teleportplugin();
@@ -71,5 +71,6 @@
 
     strictEqual(this.player.teleportplugin.go(), ':(', 'should be sad face');
   });
+  */
 
 }(window.videojs));
