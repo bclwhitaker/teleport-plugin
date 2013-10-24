@@ -25,34 +25,50 @@
       return obj;
     },
 
-    // define some reasonable defaults for this sweet plugin
+    // default values. 
     defaults = {
-      awesome: true
+      //settings you'll definitely want to override.
+      teleportServer: 'http://localhost', //the base url for your teleport server
+      fetchUserId: function(){return 'testUser';}, //function to fetch unique user identifier
+      fetchVideoId: function(){return 'testId';}, //funciton to fetch video identifier
+      //settings you might want to override
+      fetchTriggerEvent: 'loadstart', //the player event to trigger fetching the last saved position
+      seekTriggerEvent: 'play', //the player event to trigger seeking to the last saved position
+      saveTriggerEvent: 'pause', //the player event to trigger saving a last saved position
+      deleteTriggerEvent: 'ended', //the player event to trigger deleting a saved position
+      updateInterval: 10000, //how often to save user progress
+      saveSecondsFromEnd: 5 //seconds from end of video that last save can occur
     },
 
     // plugin initializer
     teleportplugin = function(options) {
       var
         // save a reference to the player instance
-        player = this,
-        user = fetchUserId() || 'test', //unique user identifier
-        videoId = '010101', //it of video being watched
-        
-        seekPosition,
-        updateInterval,
-        lastPosition = 0, 
-
+        player = this, 
+      
         // merge options and defaults
-        settings = extend({updateInterval: 10000, saveSecondsFromEnd: 5}, defaults, options || {});
+        settings = extend({}, defaults, options || {}),
+
+        updateInterval, //reference to the timer
+        seekPosition, // the fetched seek position to use on load
+        userId = settings.fetchUserId(), //unique id of current user
+        videoId = settings.fetchVideoId(); //unique id of current video
 
       // replace the initializer with the plugin functionality
       player.teleportplugin = {
+
+        /*
+         * Starts a timer to preiodically make POST requests with the current users
+         * progress within a video. You can set the interval between posts with the
+         * 'updateInterval' setting on the plugin. If you set the 'updateInterval' to 
+         * 0 user progress will only be saved on pause events.
+         */
         startUpdateInterval: function() {
+          var lastPosition = 0; // the last saved position in the interval timer
           if (settings.updateInterval > 0) {
             clearInterval(updateInterval);
             updateInterval = setInterval(function() {
               var currentPosition = player.currentTime();
-
               if (currentPosition !== lastPosition) {
                 lastPosition = currentPosition;
                 player.teleportplugin.savePosition();
@@ -60,103 +76,111 @@
             }, settings.updateInterval);
           }
         },
+
+        /*
+         * Stops updating the server preiodically with user progress.
+         */
         stopUpdateInterval: function() {
-          if (updateInterval) {
+          if (settings.updateInterval) {
             clearInterval(updateInterval);
           }
         },
+        /*
+         * Makes a POST request to a server with the last known position for the user and video
+         * combination or a user specified value.  After this call, any gets for the same 
+         * combination should return the value until it is deleted.
+         */
         savePosition: function(position) {
           //If we aren't setting a specific save point use the currentTime
           if (!position) {
             position = player.currentTime();
           }
 
-          //Only save if we're not over the lastSave threshold
+          //This 'if' condition is to prevent a race condition where a save and delete happen
+          //so close at the end of a video that the delete might be handled before the save.
           if ((player.duration() - position) > settings.saveSecondsFromEnd) {
             var 
-              saveUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/set/'+user+'/'+videoId+'/'+position.toString(),
+              saveUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/' +position.toString(),
               xmlHttp = new XMLHttpRequest();
-            xmlHttp.open( "GET", saveUrl, false );
+            xmlHttp.open( "POST", saveUrl, false );
             xmlHttp.send( null );
             return;
           } 
         },
+        /*
+         * Makes a GET request to a server for the last known position for the user and video
+         * combination.  Expected response is a positive integer greater than 0 if there
+         * is data for this comination or 0 if there is not.
+         */
         savedPosition: function() {
           var 
-            savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/get/'+user+'/'+videoId+'/',
+            savedPositionUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/',
             xmlHttp = new XMLHttpRequest();
 
           xmlHttp.open( "GET", savedPositionUrl, false );
           xmlHttp.send( null );
           return xmlHttp.responseText;
         },
+        /*
+         * Makes a DELETE request to a server to delete any data for the user and video
+         * combination.  After this call, any gets on the same comnination should return
+         * 0.
+        */
         deletePosition: function() {
           var 
-            savedPositionUrl = 'http://ec2-107-20-72-18.compute-1.amazonaws.com/delete/'+user+'/'+videoId+'/',
+            deletePositionUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/',
             xmlHttp = new XMLHttpRequest();
 
-          xmlHttp.open( "GET", savedPositionUrl, false );
+          xmlHttp.open( "DELETE", deletePositionUrl, false );
           xmlHttp.send( null );
           return xmlHttp.responseText;
         }
       };
+
+      //When a new video is loaded, fetch the user and video ids and see if there is a
+      //saved position we should seek to when play is called.
+      player.on(settings.fetchTriggerEvent, function(){
+        userId = settings.fetchUserId(); 
+        videoId = settings.fetchVideoId();
+        if (userId) {
+          seekPosition = player.teleportplugin.savedPosition();
+        }
+      });
       
-      player.on('play', function() {
+      //When play is called the first time, this will seek to the saved position gathered
+      //from the 'loadstart' event handler.  All subsequent plays in the session should bypass
+      //this behavior since the seek position is set to 'false' immediately.
+      player.on(settings.seekTriggerEvent, function() {
         var duration;
-        if (user) {
+        if (userId) {
           player.teleportplugin.startUpdateInterval();
           duration = parseInt(player.duration(), 10);
           if (seekPosition && parseInt(seekPosition, 10) !== duration) {
             player.currentTime(seekPosition);
           }
-          seekPosition = 0;
+          //this makes the above 'if' condition evaluate false on plays after the initial
+          //load of the content.
+          seekPosition = false;
         }
       });
 
-      player.on('loadstart', function(){
-        if (user) {
-          seekPosition = player.teleportplugin.savedPosition();
-        }
-      });
-
-      player.on('pause', function() {
+      //Save the current position when pause fires.
+      player.on(settings.saveTriggerEvent, function() {
         player.teleportplugin.stopUpdateInterval();
-        if (user && player.currentTime() !== player.duration()) {
+        if (userId && player.currentTime() !== player.duration()) {
           player.teleportplugin.savePosition();
         }
       });
 
-      player.on('ended', function() {
+      //Delete any saved information when ended fires.
+      player.on(settings.deleteTriggerEvent, function() {
         player.teleportplugin.stopUpdateInterval();
-        if (user) {
+        if (userId) {
           player.teleportplugin.deletePosition();
         }
       });
-    },
-
-    /**
-     * Fetchs the user's facebook ID from the BC_teleport cookie if it's present. 
-     * @return String representing the userId. If no cookie was found returns null.
-     */ 
-    fetchUserId = function() {
-      var
-        // A list of all cookies accessible from this domain. 
-        cookieList = document.cookie.split(';'),
-        
-        // Used when looping through the list to find BC_teleport.
-        currentCookie;
-
-      // Go through the list of browser cookies
-      for (var i=0; i < cookieList.length; i++) {
-        currentCookie = cookieList[i];
-          if (currentCookie.indexOf('BC_teleport=') !== -1) {
-            return currentCookie.split('=')[1];
-        }
-      }
-      // If no applicable cookie was found we return null.  
-      return null;
     };
-  
+
   // register the plugin with video.js
   vjs.plugin('teleportplugin', teleportplugin);
 
