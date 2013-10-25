@@ -155,19 +155,15 @@
         }
       });
       
-      //When play is called the first time, this will seek to the saved position gathered
-      //from the 'loadstart' event handler.  All subsequent plays in the session should bypass
-      //this behavior since the seek position is set to 'false' immediately.
+      //This will seek to the saved position gathered from the fetchTriggerEvent call
+      //All subsequent plays in the session should bypass this behavior since the seek 
+      //position is set to 'false' immediately.
       player.on(settings.seekTriggerEvent, function() {
         var duration;
-        if (userId) {
+        if (userId && seekPosition && parseInt(seekPosition, 10) !== duration) {
           player.teleportplugin.startUpdateTimer();
-          duration = parseInt(player.duration(), 10);
-          if (seekPosition && parseInt(seekPosition, 10) !== duration) {
-            player.currentTime(seekPosition);
-          }
-          //this makes the above 'if' condition evaluate false on plays after the initial
-          //load of the content.
+          seek(player, seekPosition);
+          //ignore future trigger events after the first
           seekPosition = false;
         }
       });
@@ -187,7 +183,58 @@
           player.teleportplugin.deletePosition();
         }
       });
-    };
+    },
+
+    /**
+     * Determines whether two times are 'close enough'.
+     * Unfortunately we can't count on the reported currentTime() to exactly
+     * match the one we set. The best we can do is check whether they're close.
+     * Two seconds should about do it.
+     */
+    closeEnough = function(timeA, timeB) {
+      var 
+        diff = timeA - timeB,
+        delta = 2;
+      if (isNaN(diff)) {
+        return false;
+      }
+      return Math.abs(diff) < delta;
+    },
+
+    seek = function(player, seconds) {
+      var
+        // how long to wait before retries
+        delay = 250,
+        // timer for the next retry
+        timeout,
+        // whether we've been successful in setting the currentTime
+        success = false,
+          
+      // attempt to set the currentTime
+      attempt = function(){
+        if (success || closeEnough(player.currentTime(), seconds)) {
+          success = true;
+          deregister();
+        } else {
+          player.currentTime(seconds);
+          timeout = setTimeout(attempt, delay);
+        }
+      },
+      
+      // remove the timer
+      deregister = function() {
+        clearTimeout(timeout);
+        player.off('timeupdate', deregister);
+        // one final attempt
+        if (!success) {
+          player.currentTime(seconds);
+        }
+      };
+    
+    // make the first attempt
+    player.on('timeupdate', deregister);
+    attempt();
+  };
 
   // register the plugin with video.js
   vjs.plugin('teleportplugin', teleportplugin);
