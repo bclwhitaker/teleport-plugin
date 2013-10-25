@@ -44,12 +44,12 @@
     teleportplugin = function(options) {
       var
         // save a reference to the player instance
-        player = this, 
+        player = this,
       
         // merge options and defaults
         settings = extend({}, defaults, options || {}),
 
-        updateInterval, //reference to the timer
+        updateTimer, //reference to the timer
         seekPosition, // the fetched seek position to use on load
         userId = settings.fetchUserId(), //unique id of current user
         videoId = settings.fetchVideoId(); //unique id of current video
@@ -57,17 +57,24 @@
       // replace the initializer with the plugin functionality
       player.teleportplugin = {
 
+        /**
+         * Exposes the plugin settings that are used to configure it's behaviour.
+         */
+        getPluginSettings: function() {
+          return settings;
+        },
+
         /*
          * Starts a timer to preiodically make POST requests with the current users
          * progress within a video. You can set the interval between posts with the
          * 'updateInterval' setting on the plugin. If you set the 'updateInterval' to 
          * 0 user progress will only be saved on pause events.
          */
-        startUpdateInterval: function() {
+        startUpdateTimer: function() {
           var lastPosition = 0; // the last saved position in the interval timer
           if (settings.updateInterval > 0) {
-            clearInterval(updateInterval);
-            updateInterval = setInterval(function() {
+            clearInterval(updateTimer);
+            updateTimer = setInterval(function() {
               var currentPosition = player.currentTime();
               if (currentPosition !== lastPosition) {
                 lastPosition = currentPosition;
@@ -80,18 +87,19 @@
         /*
          * Stops updating the server preiodically with user progress.
          */
-        stopUpdateInterval: function() {
+        stopUpdateTimer: function() {
           if (settings.updateInterval) {
-            clearInterval(updateInterval);
+            clearInterval(updateTimer);
           }
         },
+        
         /*
          * Makes a POST request to a server with the last known position for the user and video
-         * combination or a user specified value.  After this call, any gets for the same 
+         * combination or a user specified value. After this call, any gets for the same 
          * combination should return the value until it is deleted.
          */
         savePosition: function(position) {
-          //If we aren't setting a specific save point use the currentTime
+          // If we aren't setting a specific save point use the currentTime
           if (!position) {
             position = player.currentTime();
           }
@@ -99,13 +107,13 @@
           //This 'if' condition is to prevent a race condition where a save and delete happen
           //so close at the end of a video that the delete might be handled before the save.
           if ((player.duration() - position) > settings.saveSecondsFromEnd) {
-            var 
+            var
               saveUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/' +position.toString(),
               xmlHttp = new XMLHttpRequest();
             xmlHttp.open( "POST", saveUrl, false );
             xmlHttp.send( null );
             return;
-          } 
+          }
         },
         /*
          * Makes a GET request to a server for the last known position for the user and video
@@ -153,7 +161,7 @@
       player.on(settings.seekTriggerEvent, function() {
         var duration;
         if (userId) {
-          player.teleportplugin.startUpdateInterval();
+          player.teleportplugin.startUpdateTimer();
           duration = parseInt(player.duration(), 10);
           if (seekPosition && parseInt(seekPosition, 10) !== duration) {
             player.currentTime(seekPosition);
@@ -166,7 +174,7 @@
 
       //Save the current position when pause fires.
       player.on(settings.saveTriggerEvent, function() {
-        player.teleportplugin.stopUpdateInterval();
+        player.teleportplugin.stopUpdateTimer();
         if (userId && player.currentTime() !== player.duration()) {
           player.teleportplugin.savePosition();
         }
@@ -174,7 +182,7 @@
 
       //Delete any saved information when ended fires.
       player.on(settings.deleteTriggerEvent, function() {
-        player.teleportplugin.stopUpdateInterval();
+        player.teleportplugin.stopUpdateTimer();
         if (userId) {
           player.teleportplugin.deletePosition();
         }
