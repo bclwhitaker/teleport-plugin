@@ -108,7 +108,7 @@
           //so close at the end of a video that the delete might be handled before the save.
           if ((player.duration() - position) > settings.saveSecondsFromEnd) {
             var
-              saveUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/' +position.toString(),
+              saveUrl = settings.teleportServer + '/userId/' + userId + '/videoId/' + videoId + '/position/' + position.toString(),
               xmlHttp = new XMLHttpRequest();
             xmlHttp.open( "POST", saveUrl, false );
             xmlHttp.send( null );
@@ -122,7 +122,7 @@
          */
         savedPosition: function() {
           var 
-            savedPositionUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/',
+            savedPositionUrl = settings.teleportServer + '/userId/' + userId + '/videoId/' + videoId + '/',
             xmlHttp = new XMLHttpRequest();
 
           xmlHttp.open( "GET", savedPositionUrl, false );
@@ -136,7 +136,7 @@
         */
         deletePosition: function() {
           var 
-            deletePositionUrl = settings.teleportServer + '/' + userId + '/' + videoId + '/',
+            deletePositionUrl = settings.teleportServer + '/userId/' + userId + '/videoId/' + videoId + '/',
             xmlHttp = new XMLHttpRequest();
 
           xmlHttp.open( "DELETE", deletePositionUrl, false );
