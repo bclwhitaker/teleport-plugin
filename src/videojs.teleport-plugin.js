@@ -1,17 +1,17 @@
 /*
- * teleport-plugin
- * https://github.com/bclwhitaker/teleport-plugin
- *
- * Copyright (c) 2013 Lee Whitaker
- * Licensed under the MIT license.
- */
+* teleport-plugin
+* https://github.com/bclwhitaker/teleport-plugin
+*
+* Copyright (c) 2013 Lee Whitaker
+* Licensed under the MIT license.
+*/
 
 (function(vjs) {
 
   var
     /**
-     * Copies properties from one or more objects onto an original.
-     */
+    * Copies properties from one or more objects onto an original.
+    */
     extend = function(obj /*, arg1, arg2, ... */) {
       var arg, i, k;
       for (i = 1; i < arguments.length; i++) {
@@ -25,7 +25,7 @@
       return obj;
     },
 
-    // default values. 
+    // default values.
     defaults = {
       //settings you'll definitely want to override.
       teleportServer: 'http://localhost', //the base url for your teleport server
@@ -45,7 +45,7 @@
       var
         // save a reference to the player instance
         player = this,
-      
+
         // merge options and defaults
         settings = extend({}, defaults, options || {}),
 
@@ -58,18 +58,18 @@
       player.teleportplugin = {
 
         /**
-         * Exposes the plugin settings that are used to configure it's behaviour.
-         */
+        * Exposes the plugin settings that are used to configure it's behaviour.
+        */
         getPluginSettings: function() {
           return settings;
         },
 
         /*
-         * Starts a timer to preiodically make POST requests with the current users
-         * progress within a video. You can set the interval between posts with the
-         * 'updateInterval' setting on the plugin. If you set the 'updateInterval' to 
-         * 0 user progress will only be saved on pause events.
-         */
+        * Starts a timer to preiodically make POST requests with the current users
+        * progress within a video. You can set the interval between posts with the
+        * 'updateInterval' setting on the plugin. If you set the 'updateInterval' to
+        * 0 user progress will only be saved on pause events.
+        */
         startUpdateTimer: function() {
           var lastPosition = 0; // the last saved position in the interval timer
           if (settings.updateInterval > 0) {
@@ -85,19 +85,19 @@
         },
 
         /*
-         * Stops updating the server preiodically with user progress.
-         */
+        * Stops updating the server preiodically with user progress.
+        */
         stopUpdateTimer: function() {
           if (settings.updateInterval) {
             clearInterval(updateTimer);
           }
         },
-        
+
         /*
-         * Makes a POST request to a server with the last known position for the user and video
-         * combination or a user specified value. After this call, any gets for the same 
-         * combination should return the value until it is deleted.
-         */
+        * Makes a POST request to a server with the last known position for the user and video
+        * combination or a user specified value. After this call, any gets for the same
+        * combination should return the value until it is deleted.
+        */
         savePosition: function(position) {
           // If we aren't setting a specific save point use the currentTime
           if (!position) {
@@ -116,12 +116,12 @@
           }
         },
         /*
-         * Makes a GET request to a server for the last known position for the user and video
-         * combination.  Expected response is a positive integer greater than 0 if there
-         * is data for this comination or 0 if there is not.
-         */
+        * Makes a GET request to a server for the last known position for the user and video
+        * combination. Expected response is a positive integer greater than 0 if there
+        * is data for this comination or 0 if there is not.
+        */
         savedPosition: function() {
-          var 
+          var
             savedPositionUrl = settings.teleportServer + '/userId/' + userId + '/videoId/' + videoId + '/',
             xmlHttp = new XMLHttpRequest();
 
@@ -130,12 +130,12 @@
           return xmlHttp.responseText;
         },
         /*
-         * Makes a DELETE request to a server to delete any data for the user and video
-         * combination.  After this call, any gets on the same comnination should return
-         * 0.
+        * Makes a DELETE request to a server to delete any data for the user and video
+        * combination. After this call, any gets on the same comnination should return
+        * 0.
         */
         deletePosition: function() {
-          var 
+          var
             deletePositionUrl = settings.teleportServer + '/userId/' + userId + '/videoId/' + videoId + '/',
             xmlHttp = new XMLHttpRequest();
 
@@ -147,16 +147,16 @@
 
       //When a new video is loaded, fetch the user and video ids and see if there is a
       //saved position we should seek to when play is called.
-      player.on(settings.fetchTriggerEvent, function(){
-        userId = settings.fetchUserId(); 
+      player.on(settings.fetchTriggerEvent, function() {
+        userId = settings.fetchUserId();
         videoId = settings.fetchVideoId();
         if (userId) {
           seekPosition = player.teleportplugin.savedPosition();
         }
       });
-      
+
       //This will seek to the saved position gathered from the fetchTriggerEvent call
-      //All subsequent plays in the session should bypass this behavior since the seek 
+      //All subsequent plays in the session should bypass this behavior since the seek
       //position is set to 'false' immediately.
       player.on(settings.seekTriggerEvent, function() {
         var duration;
@@ -186,13 +186,13 @@
     },
 
     /**
-     * Determines whether two times are 'close enough'.
-     * Unfortunately we can't count on the reported currentTime() to exactly
-     * match the one we set. The best we can do is check whether they're close.
-     * Two seconds should about do it.
-     */
+    * Determines whether two times are 'close enough'.
+    * Unfortunately we can't count on the reported currentTime() to exactly
+    * match the one we set. The best we can do is check whether they're close.
+    * Two seconds should about do it.
+    */
     closeEnough = function(timeA, timeB) {
-      var 
+      var
         diff = timeA - timeB,
         delta = 2;
       if (isNaN(diff)) {
