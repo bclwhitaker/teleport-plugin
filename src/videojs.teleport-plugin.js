@@ -140,6 +140,7 @@
             xmlHttp = new XMLHttpRequest();
 
           xmlHttp.open( "DELETE", deletePositionUrl, false );
+          xmlHttp.timeout = 1500;
           xmlHttp.send( null );
           return xmlHttp.responseText;
         }
